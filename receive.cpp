@@ -20,7 +20,6 @@ receive::receive(QWidget *parent) :
     ui->setupUi(this);
     this->mser.listen(QHostAddress::AnyIPv4, 50001);
 
-    this->neuminfo.clear();
     connect(&mser, &QTcpServer::newConnection, this, &receive::client_link);
 }
 
@@ -38,51 +37,73 @@ void receive::client_link()
 
 void receive::read_data()
 {
-    QTcpSocket *now = (QTcpSocket *)sender();
-    clientinfo = now->readAll();
-    if(clientinfo.at(0) == (QChar)'A'){
-        QStringList now = clientinfo.split(".");
-        ui->listWidget->addItem(now[1]);
-        return;
-    }
-    else if(clientinfo.at(0) == (QChar)'B'){
-        QStringList now = clientinfo.split(".");
-        ui->listWidget_2->addItem(now[1]);
-        return;
-    }
+       QTcpSocket *now = qobject_cast<QTcpSocket *>(sender());
+       if (!now)
+           return;
 
-    if(this->neuminfo.isEmpty()){
-        neuminfo = clientinfo;
-        QStringList tat = neuminfo.split(":");
-        tw = new QTableWidget();
-        ui->tabWidget->addTab(tw, tat[0]+"号桌");
-        this->food_num = QString(tat.at(1)).toInt();
-        tw->setColumnCount(3);
-        tw->setRowCount(food_num);
-        tw->setHorizontalHeaderLabels(QStringList()<<"菜名"<<"价格"<<"数量");
-    }else{
-        QString mdata = clientinfo;
-        qDebug() << mdata;
-        QJsonParseError erro;
-        QByteArray barr = mdata.toUtf8();
-        QJsonDocument docu = QJsonDocument::fromJson(barr, &erro);
-        if(erro.error != QJsonParseError::NoError){
-            qDebug() << "not json data";
+       QByteArray clientData = now->readAll();
+       QString message = QString::fromUtf8(clientData);
+
+        // 检查是否是服务请求
+        if (message.contains("号桌子需要服务")) {
+          ui->listWidget->addItem(message);
+          return;
+        }
+        // 检查是否是支付请求
+        if (message.startsWith("B."))
+        {
+            QStringList lines = message.split("\n");
+            for (const QString &line : lines)
+            {
+                 ui->listWidget_2->addItem(line);
+            }
             return;
         }
-        QJsonObject obje = docu.object();
-        QStringList tat = this->neuminfo.split(":");
-        QJsonArray arra = obje.value(tat.at(0)).toArray();
-        for(int i=0; i<this->food_num; i++)
-        {
-            QJsonObject objarr = arra.at(i).toObject();
-            this->tw->setItem(i, 0, new QTableWidgetItem(objarr.value("菜名").toString()));
-            this->tw->setItem(i, 1, new QTableWidgetItem(objarr.value("价格").toString()));
-            this->tw->setItem(i, 2, new QTableWidgetItem(QString::number(objarr.value("数量").toInt())));
-        }
-        neuminfo.clear();
-        food_num = 0;
-    }
+
+
+        //json解析重要的
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(clientData, &parseError);
+
+       if (parseError.error != QJsonParseError::NoError) {
+           qDebug() << "JSON parse error:" << parseError.errorString();
+           return;
+       }
+
+       QJsonObject rootObj = doc.object();
+
+       // 获取餐桌号和就餐人数
+       int tableNumber = rootObj.value("餐桌号").toInt();
+       int dineNumber = rootObj.value("就餐人数").toInt();
+       QJsonArray orderArray = rootObj.value("订单").toArray();
+       double totalPrice = rootObj.value("总价").toDouble();
+
+       tw = new QTableWidget();
+       ui->tabWidget->addTab(tw, QString::number(tableNumber) + "号桌");
+       tw->setColumnCount(3);
+       tw->setRowCount(orderArray.size()+2);
+       tw->setHorizontalHeaderLabels(QStringList() << "菜名" << "数量" << "单价");
+        int i;
+       for (i = 0; i < orderArray.size(); ++i) {
+           QJsonObject orderObj = orderArray.at(i).toObject();
+           QString foodName = orderObj.value("菜名").toString();
+           int quantity = orderObj.value("数量").toInt();
+           double price = orderObj.value("单价").toDouble();
+
+           tw->setItem(i, 0, new QTableWidgetItem(foodName));
+           tw->setItem(i, 1, new QTableWidgetItem(QString::number(quantity)));
+           tw->setItem(i, 2, new QTableWidgetItem(QString::number(price, 'f', 2)));
+       }
+       // 在最后一行显示总价
+         tw->setItem(orderArray.size(), 0, new QTableWidgetItem("总价"));
+         tw->setItem(orderArray.size(), 1, new QTableWidgetItem(""));
+         tw->setItem(orderArray.size(), 2, new QTableWidgetItem(QString::number(totalPrice, 'f', 2)));
+
+
+         //再加一行显示就餐人数
+         tw->setItem(orderArray.size()+1, 0, new QTableWidgetItem("就餐人数"));
+         tw->setItem(orderArray.size()+1, 1, new QTableWidgetItem(QString::number(dineNumber)));
+         tw->setItem(orderArray.size()+1, 2, new QTableWidgetItem(""));
 }
 
 void receive::on_tabWidget_tabCloseRequested(int index)

@@ -36,8 +36,12 @@ private:
     QTcpSocket *msoc;
     QTableWidget *tw;
     QString	neuminfo;	//客户端菜单头信息
-    QString clientinfo;		//客户服务信息
+    //QString clientinfo;		//客户服务信息
     int food_num;		//食物的数量
+
+    QByteArray clientinfo;
+
+
 
 };
 
