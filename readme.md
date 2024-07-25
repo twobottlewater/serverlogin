@@ -3,6 +3,8 @@
 效果图如下
 
 
+![](mdres_images/tup2.png)
+
 
 
 
@@ -11,7 +13,9 @@
 账号666
 
 在代码里面可以改的
-![tupian2](https://github.com/user-attachments/assets/cca09d51-993c-45ed-bce2-9dd840166ba5)
+
+
+![](mdres_images/tupian2.png)
 
 
 
